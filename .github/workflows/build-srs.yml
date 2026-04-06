@@ -1,0 +1,59 @@
+name: Build SRS Files
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Ежедневно в полночь UTC
+  workflow_dispatch:      # Ручной запуск
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Clone geodat2srs
+        run: |
+          git clone https://github.com/runetfreedom/geodat2srs.git /tmp/geodat2srs
+
+      - name: Build geodat2srs
+        run: |
+          cd /tmp/geodat2srs
+          go build -o geodat2srs .
+
+      - name: Download geoip.dat
+        run: |
+          mkdir -p /tmp/geodata
+          curl -L -o /tmp/geodata/geoip.dat https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/geoip.dat
+
+      - name: Download geosite.dat
+        run: |
+          curl -L -o /tmp/geodata/geosite.dat https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat
+
+      - name: Convert geoip.dat to SRS
+        run: |
+          mkdir -p rules
+          /tmp/geodat2srs/geodat2srs geoip -i /tmp/geodata/geoip.dat -o rules --prefix "geoip-"
+
+      - name: Convert geosite.dat to SRS
+        run: |
+          /tmp/geodat2srs/geodat2srs geosite -i /tmp/geodata/geosite.dat -o rules --prefix "geosite-"
+
+      - name: List generated files
+        run: |
+          ls -la rules/
+
+      - name: Upload SRS files as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: srs-files
+          path: rules/*.srs
+          retention-days: 30
