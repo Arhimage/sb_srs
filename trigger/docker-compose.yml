@@ -7,31 +7,49 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_USER=${GITHUB_USER}
       - GITHUB_REPO=${GITHUB_REPO}
+      - GITHUB_REF=${GITHUB_REF:-master}
       - CRON_SCHEDULE=${CRON_SCHEDULE:-0 */2 * * *}
-    command: >
+    command: |
       sh -c '
-      apk add --no-cache curl >/dev/null
+      apk add curl >/dev/null 2>&1
 
-      cat > /run.sh << '\''EOF'\''
+      GITHUB_TOKEN=$$(echo "$$GITHUB_TOKEN" | tr -d "\r\n ")
+      GITHUB_USER=$$(echo "$$GITHUB_USER" | tr -d "\r\n ")
+      GITHUB_REPO=$$(echo "$$GITHUB_REPO" | tr -d "\r\n ")
+      GITHUB_REF=$$(echo "$$GITHUB_REF" | tr -d "\r\n ")
+      export GITHUB_TOKEN GITHUB_USER GITHUB_REPO GITHUB_REF CRON_SCHEDULE
+
+      cat > /run.sh << '\''SCRIPT'\''
       #!/bin/sh
-      trigger() {
-        echo "[$(date)] Triggering..."
-        RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -d "{\"ref\":\"main\"}" \
-          "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/actions/workflows/build-srs.yml/dispatches")
-        if [ "$RESP" = "204" ]; then
-          echo "[$(date)] OK"
-        else
-          echo "[$(date)] ERROR $RESP"
-        fi
-      }
-      trigger
-      EOF
+      echo "========================================="
+      echo "  SRS Build Trigger - $(date)"
+      echo "  User: $$GITHUB_USER"
+      echo "  Repo: $$GITHUB_REPO"
+      echo "  Ref: $$GITHUB_REF"
+
+      if [ -z "$$GITHUB_USER" ] || [ -z "$$GITHUB_REPO" ] || [ -z "$$GITHUB_TOKEN" ] || [ -z "$$GITHUB_REF" ]; then
+        echo "  ERROR: GITHUB_USER, GITHUB_REPO, GITHUB_TOKEN, and GITHUB_REF must be set"
+        echo "========================================="
+        exit 1
+      fi
+
+      URL="https://api.github.com/repos/$${GITHUB_USER}/$${GITHUB_REPO}/actions/workflows/build-srs.yml/dispatches"
+      echo "  URL: $$URL"
+
+      DATA="{\"ref\":\"$$GITHUB_REF\"}"
+      echo "  Data: $$DATA"
+      echo "  Token len: $$(echo -n "$$GITHUB_TOKEN" | wc -c)"
+
+      RESP=$$(curl -s -o /tmp/resp -w "%{http_code}" -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $$GITHUB_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$$DATA" "$$URL")
+
+      echo "  HTTP Status: $$RESP"
+      if [ -f /tmp/resp ]; then cat /tmp/resp; fi
+      echo ""
+      echo "========================================="
+      SCRIPT
+
       chmod +x /run.sh
       /run.sh
-      echo "$CRON_SCHEDULE /run.sh >> /var/log/cron.log 2>&1" | crontab -
+      echo "$$CRON_SCHEDULE /run.sh >> /var/log/cron.log 2>&1" | crontab -
       exec crond -f -l 2
       '
