@@ -10,6 +10,10 @@
 - **geosite.dat**: [runetfreedom/russia-blocked-geosite](https://github.com/runetfreedom/russia-blocked-geosite)
 - **Конвертер**: локальная утилита в `tools/geodat2srs`, основанная на [runetfreedom/geodat2srs](https://github.com/runetfreedom/geodat2srs)
 
+Ссылки на последние `.srs` из релиза:
+- `geoip.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip.srs`
+- `geosite.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/geosite.srs`
+
 ## Автоматическая сборка
 
 GitHub Actions workflow запускается каждые 2 часа и:
@@ -18,15 +22,6 @@ GitHub Actions workflow запускается каждые 2 часа и:
 3. Собирает ровно два файла: `geoip.srs` и `geosite.srs`
 4. Публикует результат в release `srs-latest`
 5. Сохраняет артефакты (1 день)
-
-## Локальный запуск
-
-Для локальной конвертации (требуется Go):
-
-```bash
-chmod +x scripts/convert.sh
-./scripts/convert.sh
-```
 
 ## Использование в sing-box
 
