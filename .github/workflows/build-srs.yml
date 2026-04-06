@@ -31,13 +31,23 @@ jobs:
       - name: List generated files
         run: |
           ls -la rules/
+          test -f rules/geoip.srs
+          test -f rules/geosite.srs
 
       - name: Upload SRS files as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: srs-files
-          path: rules/*.srs
+          path: |
+            rules/geoip.srs
+            rules/geosite.srs
           retention-days: 1
+
+      - name: Delete previous release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete srs-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
 
       - name: Publish SRS files to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -49,7 +59,9 @@ jobs:
             geoip.dat: https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/geoip.dat
             geosite.dat: https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat
             Source: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          files: rules/*.srs
+          files: |
+            rules/geoip.srs
+            rules/geosite.srs
           overwrite_files: true
           make_latest: true
           fail_on_unmatched_files: true
