@@ -1,0 +1,10 @@
+services:
+  srs-trigger:
+    build: .
+    container_name: srs-trigger
+    restart: unless-stopped
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_USER=${GITHUB_USER}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 0 * * *}
