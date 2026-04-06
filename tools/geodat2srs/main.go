@@ -18,32 +18,85 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type source struct {
+	Name string
+	Kind string
+	URLs []string
+}
+
+type sourceFlags []source
+
+func (s *sourceFlags) String() string {
+	return fmt.Sprint([]source(*s))
+}
+
+func (s *sourceFlags) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("source must be in format kind:name=url1,url2")
+	}
+
+	left := strings.SplitN(parts[0], ":", 2)
+	if len(left) != 2 {
+		return fmt.Errorf("source must be in format kind:name=url1,url2")
+	}
+
+	urls := make([]string, 0)
+	for _, rawURL := range strings.Split(parts[1], ",") {
+		url := strings.TrimSpace(rawURL)
+		if url != "" {
+			urls = append(urls, url)
+		}
+	}
+
+	if len(urls) == 0 {
+		return fmt.Errorf("source must contain at least one url")
+	}
+
+	*s = append(*s, source{
+		Kind: strings.TrimSpace(left[0]),
+		Name: strings.TrimSpace(left[1]),
+		URLs: urls,
+	})
+
+	return nil
+}
+
 func main() {
-	geoIPPath := flag.String("geoip", "geoip.dat", "Path or URL to geoip.dat")
-	geoSitePath := flag.String("geosite", "geosite.dat", "Path or URL to geosite.dat")
 	outputDir := flag.String("output-dir", "rules", "Output directory")
+	var sources sourceFlags
+	flag.Var(&sources, "source", "Source in format kind:name=url1,url2")
 	flag.Parse()
+
+	if len(sources) == 0 {
+		fail(fmt.Errorf("at least one -source argument is required"))
+	}
 
 	if err := os.MkdirAll(*outputDir, os.ModePerm); err != nil {
 		fail(err)
 	}
 
-	geoIPBytes, err := readFile(*geoIPPath)
-	if err != nil {
-		fail(err)
-	}
+	for _, source := range sources {
+		input, usedURL, err := readFirstAvailable(source.URLs)
+		if err != nil {
+			fail(fmt.Errorf("download %s: %w", source.Name, err))
+		}
 
-	geoSiteBytes, err := readFile(*geoSitePath)
-	if err != nil {
-		fail(err)
-	}
+		fmt.Fprintf(os.Stdout, "using %s from %s\n", source.Name, usedURL)
 
-	if err := writeGeoIP(filepath.Join(*outputDir, "geoip.srs"), geoIPBytes); err != nil {
-		fail(err)
-	}
+		outputPath := filepath.Join(*outputDir, source.Name+".srs")
+		switch source.Kind {
+		case "geoip":
+			err = writeGeoIP(outputPath, input)
+		case "geosite":
+			err = writeGeoSite(outputPath, input)
+		default:
+			err = fmt.Errorf("unsupported source kind: %s", source.Kind)
+		}
 
-	if err := writeGeoSite(filepath.Join(*outputDir, "geosite.srs"), geoSiteBytes); err != nil {
-		fail(err)
+		if err != nil {
+			fail(fmt.Errorf("write %s: %w", outputPath, err))
+		}
 	}
 }
 
@@ -147,17 +200,30 @@ func writeRuleSet(outputPath string, ruleSet option.PlainRuleSet) error {
 	return srs.Write(outputFile, ruleSet)
 }
 
+func readFirstAvailable(paths []string) ([]byte, string, error) {
+	var errors []string
+	for _, path := range paths {
+		data, err := readFile(path)
+		if err == nil {
+			return data, path, nil
+		}
+		errors = append(errors, err.Error())
+	}
+
+	return nil, "", fmt.Errorf(strings.Join(errors, "; "))
+}
+
 func readFile(path string) ([]byte, error) {
 	switch {
 	case strings.HasPrefix(strings.ToLower(path), "http://"), strings.HasPrefix(strings.ToLower(path), "https://"):
 		resp, err := http.Get(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("failed to get remote file %s, http status code %d", path, resp.StatusCode)
+			return nil, fmt.Errorf("%s: http status code %d", path, resp.StatusCode)
 		}
 
 		return io.ReadAll(resp.Body)
