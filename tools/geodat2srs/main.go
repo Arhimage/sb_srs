@@ -25,9 +25,14 @@ type source struct {
 }
 
 type sourceFlags []source
+type stringFlags []string
 
 func (s *sourceFlags) String() string {
 	return fmt.Sprint([]source(*s))
+}
+
+func (s *stringFlags) String() string {
+	return fmt.Sprint([]string(*s))
 }
 
 func (s *sourceFlags) Set(value string) error {
@@ -62,10 +67,22 @@ func (s *sourceFlags) Set(value string) error {
 	return nil
 }
 
+func (s *stringFlags) Set(value string) error {
+	value = normalizeName(value)
+	if value == "" {
+		return fmt.Errorf("empty value")
+	}
+
+	*s = append(*s, value)
+	return nil
+}
+
 func main() {
 	outputDir := flag.String("output-dir", "rules", "Output directory")
 	var sources sourceFlags
+	var siteCategories stringFlags
 	flag.Var(&sources, "source", "Source in format kind:name=url1,url2")
+	flag.Var(&siteCategories, "site-category", "Allowed geosite category name")
 	flag.Parse()
 
 	if len(sources) == 0 {
@@ -88,7 +105,7 @@ func main() {
 		case "geoip":
 			err = writeGeoIP(filepath.Join(*outputDir, source.Name+".srs"), input)
 		case "geosite":
-			err = writeGeoSiteCategories(*outputDir, source.Name, input)
+			err = writeGeoSiteCategories(*outputDir, source.Name, input, siteCategories)
 		default:
 			err = fmt.Errorf("unsupported source kind: %s", source.Kind)
 		}
@@ -134,16 +151,29 @@ func writeGeoIP(outputPath string, input []byte) error {
 	})
 }
 
-func writeGeoSiteCategories(outputDir string, prefix string, input []byte) error {
+func writeGeoSiteCategories(outputDir string, prefix string, input []byte, allowedCategories []string) error {
 	var geoSiteList routercommon.GeoSiteList
 	if err := proto.Unmarshal(input, &geoSiteList); err != nil {
 		return fmt.Errorf("parse geosite.dat: %w", err)
+	}
+
+	allowed := make(map[string]struct{}, len(allowedCategories))
+	for _, category := range allowedCategories {
+		allowed[normalizeName(category)] = struct{}{}
 	}
 
 	for _, entry := range geoSiteList.Entry {
 		code := normalizeName(entry.GetCode())
 		if code == "" {
 			code = normalizeName(entry.GetCountryCode())
+		}
+		if code == "" {
+			continue
+		}
+		if len(allowed) > 0 {
+			if _, ok := allowed[code]; !ok {
+				continue
+			}
 		}
 		if code == "" {
 			continue

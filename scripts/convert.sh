@@ -30,7 +30,14 @@ go run . \
   -source "geoip:ru-blocked-community=https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/ru-blocked-community.dat,https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/ru-blocked-community.dat" \
   -source "geoip:re-filter=https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/re-filter.dat,https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/re-filter.dat" \
   -source "geoip:private=https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/private.dat,https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/private.dat" \
-  -source "geosite:geosite=https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat,https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geosite@release/geosite.dat"
+  -source "geosite:geosite=https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat,https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geosite@release/geosite.dat" \
+  -site-category "ru-blocked" \
+  -site-category "ru-blocked-all" \
+  -site-category "category-ads-all" \
+  -site-category "openai" \
+  -site-category "win-spy" \
+  -site-category "win-update" \
+  -site-category "win-extra"
 
 echo ""
 echo "=== Conversion Complete ==="
