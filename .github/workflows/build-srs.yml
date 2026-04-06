@@ -5,6 +5,9 @@ on:
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -57,3 +60,16 @@ jobs:
           name: srs-files
           path: rules/*.srs
           retention-days: 1
+
+      - name: Publish SRS files to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: srs-latest
+          name: SRS Latest
+          body: |
+            Auto-updated SRS files from workflow run #${{ github.run_number }}.
+            Source: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          files: rules/*.srs
+          overwrite_files: true
+          make_latest: true
+          fail_on_unmatched_files: true
