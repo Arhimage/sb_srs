@@ -1,2 +1,4 @@
 rules/
 .qwen/
+_verify_rules/
+tools/geodat2srs/*.exe
