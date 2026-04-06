@@ -84,18 +84,17 @@ func main() {
 
 		fmt.Fprintf(os.Stdout, "using %s from %s\n", source.Name, usedURL)
 
-		outputPath := filepath.Join(*outputDir, source.Name+".srs")
 		switch source.Kind {
 		case "geoip":
-			err = writeGeoIP(outputPath, input)
+			err = writeGeoIP(filepath.Join(*outputDir, source.Name+".srs"), input)
 		case "geosite":
-			err = writeGeoSite(outputPath, input)
+			err = writeGeoSiteCategories(*outputDir, source.Name, input)
 		default:
 			err = fmt.Errorf("unsupported source kind: %s", source.Kind)
 		}
 
 		if err != nil {
-			fail(fmt.Errorf("write %s: %w", outputPath, err))
+			fail(fmt.Errorf("write %s: %w", source.Name, err))
 		}
 	}
 }
@@ -135,15 +134,23 @@ func writeGeoIP(outputPath string, input []byte) error {
 	})
 }
 
-func writeGeoSite(outputPath string, input []byte) error {
+func writeGeoSiteCategories(outputDir string, prefix string, input []byte) error {
 	var geoSiteList routercommon.GeoSiteList
 	if err := proto.Unmarshal(input, &geoSiteList); err != nil {
 		return fmt.Errorf("parse geosite.dat: %w", err)
 	}
 
-	items := make([]geosite.Item, 0)
-	seen := make(map[string]struct{})
 	for _, entry := range geoSiteList.Entry {
+		code := normalizeName(entry.GetCode())
+		if code == "" {
+			code = normalizeName(entry.GetCountryCode())
+		}
+		if code == "" {
+			continue
+		}
+
+		items := make([]geosite.Item, 0)
+		seen := make(map[string]struct{})
 		for _, domain := range entry.Domain {
 			switch domain.Type {
 			case routercommon.Domain_Plain:
@@ -159,22 +166,32 @@ func writeGeoSite(outputPath string, input []byte) error {
 				appendItem(&items, seen, geosite.RuleTypeDomain, domain.Value)
 			}
 		}
-	}
 
-	compiled := geosite.Compile(items)
-	return writeRuleSet(outputPath, option.PlainRuleSet{
-		Rules: []option.HeadlessRule{
-			{
-				Type: C.RuleTypeDefault,
-				DefaultOptions: option.DefaultHeadlessRule{
-					Domain:        compiled.Domain,
-					DomainSuffix:  compiled.DomainSuffix,
-					DomainKeyword: compiled.DomainKeyword,
-					DomainRegex:   compiled.DomainRegex,
+		if len(items) == 0 {
+			continue
+		}
+
+		compiled := geosite.Compile(items)
+		outputPath := filepath.Join(outputDir, prefix+"-"+code+".srs")
+		err := writeRuleSet(outputPath, option.PlainRuleSet{
+			Rules: []option.HeadlessRule{
+				{
+					Type: C.RuleTypeDefault,
+					DefaultOptions: option.DefaultHeadlessRule{
+						Domain:        compiled.Domain,
+						DomainSuffix:  compiled.DomainSuffix,
+						DomainKeyword: compiled.DomainKeyword,
+						DomainRegex:   compiled.DomainRegex,
+					},
 				},
 			},
-		},
-	})
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func appendItem(items *[]geosite.Item, seen map[string]struct{}, ruleType geosite.ItemType, value string) {
@@ -198,6 +215,15 @@ func writeRuleSet(outputPath string, ruleSet option.PlainRuleSet) error {
 	defer outputFile.Close()
 
 	return srs.Write(outputFile, ruleSet)
+}
+
+func normalizeName(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.ReplaceAll(value, ":", "-")
+	value = strings.ReplaceAll(value, "/", "-")
+	value = strings.ReplaceAll(value, "\\", "-")
+	value = strings.ReplaceAll(value, " ", "-")
+	return value
 }
 
 func readFirstAvailable(paths []string) ([]byte, string, error) {

@@ -1,50 +1,57 @@
-# SRS Rules для sing-box
+# SRS Rules for sing-box
 
-Автоматическая конвертация набора geoip/geosite `.dat` файлов в `.srs` для sing-box каждые 2 часа.
+Автоматическая конвертация набора `geoip/geosite` `.dat` файлов в `.srs` для `sing-box` каждые 2 часа.
 
-Файлы `.srs` публикуются в релизе `srs-latest` и дополнительно доступны как артефакты в разделе Actions (хранятся 1 день).
+Сгенерированные `.srs` публикуются в релизе `srs-latest` и дополнительно доступны как GitHub Actions artifacts на 1 день.
 
-## Источники данных
+## Sources
 
-- **geoip.dat family**: [runetfreedom/russia-blocked-geoip](https://github.com/runetfreedom/russia-blocked-geoip)
-- **geosite.dat**: [runetfreedom/russia-blocked-geosite](https://github.com/runetfreedom/russia-blocked-geosite)
-- **Конвертер**: локальная утилита в `tools/geodat2srs`, основанная на [runetfreedom/geodat2srs](https://github.com/runetfreedom/geodat2srs)
+- `geoip.dat` family: [runetfreedom/russia-blocked-geoip](https://github.com/runetfreedom/russia-blocked-geoip)
+- `geosite.dat`: [runetfreedom/russia-blocked-geosite](https://github.com/runetfreedom/russia-blocked-geosite)
+- локальный конвертер: `tools/geodat2srs`
 
-Доступные категории `geosite.dat`:
-- Все категории из `@v2fly/domain-list-community`, включая `google`, `discord`, `youtube`, `twitter`, `meta`, `openai` и другие
-- `geosite:ru-blocked` — заблокированные в России домены (`antifilter-download-community` + `re:filter`)
-- `geosite:ru-blocked-all` — все известные заблокированные в России домены (`antifilter-download` + `antifilter-download-community` + `re:filter`)
-- `geosite:ru-available-only-inside` — домены, доступные только внутри России
-- `geosite:antifilter-download` — все домены из `antifilter.download`
-- `geosite:antifilter-download-community` — все домены из `community.antifilter.download`
-- `geosite:refilter` — все домены из `re:filter`
-- `geosite:category-ads-all` — все рекламные домены
-- `geosite:win-spy` — домены, используемые Windows для слежки и сбора аналитики
-- `geosite:win-update` — домены, используемые Windows для обновлений
-- `geosite:win-extra` — прочие домены, используемые Windows
+## Release Links
 
-Ссылки на последние `.srs` из релиза:
-- `geoip.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip.srs`
-- `geoip-asn.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip-asn.srs`
-- `geoip-ru-only.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip-ru-only.srs`
-- `ru-blocked.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/ru-blocked.srs`
-- `ru-blocked-community.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/ru-blocked-community.srs`
-- `re-filter.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/re-filter.srs`
-- `private.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/private.srs`
-- `geosite.srs`: `https://github.com/Arhimage/sb_srs/releases/latest/download/geosite.srs`
+### IP Rules
 
-## Автоматическая сборка
+- `geoip`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip.srs`
+- `geoip-asn`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip-asn.srs`
+- `geoip-ru-only`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geoip-ru-only.srs`
+- `ru-blocked`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/ru-blocked.srs`
+- `ru-blocked-community`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/ru-blocked-community.srs`
+- `re-filter`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/re-filter.srs`
+- `private`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/private.srs`
 
-GitHub Actions workflow запускается каждые 2 часа и:
-1. Запускает `scripts/convert.sh`
-2. Передаёт список источников аргументами в локальную утилиту `tools/geodat2srs`
-3. Собирает набор `.srs` файлов с именами источников
-4. Публикует результат в release `srs-latest`
-5. Сохраняет артефакты (1 день)
+### Site Rules
 
-## Использование в sing-box
+- `geosite-ru-blocked`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-ru-blocked.srs`
+- `geosite-ru-blocked-all`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-ru-blocked-all.srs`
+- `geosite-category-ads-all`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-category-ads-all.srs`
+- `geosite-openai`
+  `https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-openai.srs`
 
-Файлы из директории `rules/` или из release можно использовать в конфигурации sing-box:
+Остальные site-категории публикуются в том же формате:
+`https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-<category>.srs`
+
+## Build Flow
+
+1. Запускается `scripts/convert.sh`.
+2. Список источников передаётся аргументами в `tools/geodat2srs`.
+3. Для `geoip` создаётся один `.srs` на источник.
+4. `geosite.dat` делится на отдельные `geosite-<category>.srs`.
+5. Результат публикуется в release `srs-latest`.
+
+## sing-box Example
 
 ```json
 {
@@ -56,6 +63,10 @@ GitHub Actions workflow запускается каждые 2 часа и:
       },
       {
         "rule_set": "ru-blocked-sites",
+        "outbound": "block"
+      },
+      {
+        "rule_set": "ads-sites",
         "outbound": "block"
       }
     ],
@@ -70,7 +81,13 @@ GitHub Actions workflow запускается каждые 2 часа и:
         "tag": "ru-blocked-sites",
         "type": "remote",
         "format": "binary",
-        "url": "https://github.com/Arhimage/sb_srs/releases/latest/download/geosite.srs"
+        "url": "https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-ru-blocked.srs"
+      },
+      {
+        "tag": "ads-sites",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://github.com/Arhimage/sb_srs/releases/latest/download/geosite-category-ads-all.srs"
       }
     ]
   }
